@@ -1,0 +1,28 @@
+{
+  "name": "qctraining-schema",
+  "version": "1.0.3",
+  "description": "shared schema for qctrn project",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "generate": "npx prisma generate",
+    "postinstall": "npm run generate"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wasserwatt/qctrn-schema.git"
+  },
+  "keywords": [
+    "shared-schema"
+  ],
+  "author": "wazwatt",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/wasserwatt/qctrn-schema/issues"
+  },
+  "homepage": "https://github.com/wasserwatt/qctrn-schema#readme",
+  "devDependencies": {
+    "@prisma/client": "^5.22.0",
+    "prisma": "^5.22.0"
+  }
+}

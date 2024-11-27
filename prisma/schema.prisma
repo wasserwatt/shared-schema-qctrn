@@ -1,0 +1,436 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DB_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  seed     = "prisma/seed.ts"
+}
+
+// Shared models
+model User {
+  id                Int                    @id @default(autoincrement())
+  userId            String                 @unique
+  firstName         String
+  lastName          String
+  password          String
+  companyId         Int?
+  companyBranchId   Int?
+  departmentId      Int?
+  department        Department?            @relation(fields: [departmentId], references: [id])
+  role              String
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  deletedAt         DateTime?
+  processes         Process[] // Reverse relation to Process
+  exams             ExamAttempt[]
+  enrollments       Enrollment[] // Reverse relation to Enrollment
+  oplDocuments      OplDocument[] // Reverse relation to OplDocument
+  files             File[] // Reverse relation to File
+  createdCourses    Course[]               @relation("CourseCreator") // Courses created by this user
+  deletedCourses    Course[]               @relation("CourseDeletor") // Courses deleted by this user
+  courseCompletions UserCourseCompletion[] // Reverse relation to UserCourseCompletion
+  project           Project[]
+
+  @@unique([id, userId])
+}
+
+model Company {
+  id            Int             @id @default(autoincrement())
+  companyName   String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  deletedAt     DateTime?
+  companyBranch CompanyBranch[]
+}
+
+model CompanyBranch {
+  id                Int     @id @default(autoincrement())
+  companyId         Int
+  companyBranchName String
+  company           Company @relation(fields: [companyId], references: [id])
+}
+
+model Department {
+  id             Int       @id @default(autoincrement())
+  departmentName String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+  user           User[]
+  Course         Course[]
+}
+
+// Training Project Models
+model Course {
+  id           Int                    @id @default(autoincrement())
+  title        String
+  description  String?
+  pdfUrl       String? // Link to PDF for course
+  videoUrl     String? // Link to video for course
+  typeId       Int //for course type
+  template     Boolean                @default(false)
+  departmentId Int?
+  department   Department?            @relation(fields: [departmentId], references: [id])
+  processId    Int                    @default(0)
+  process      Process?               @relation("ProcessCourses", fields: [processId], references: [id])
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @default(now()) @updatedAt
+  createdBy    Int // User ID of the creator
+  deletedBy    Int? // User ID of the admin who deleted the course
+  isDeleted    Boolean                @default(false) // Flag for soft delete
+  enrollments  Enrollment[] // Reverse relation to Enrollment
+  files        File[] // Reverse relation to File
+  exams        Exam[] // Reverse relation to Exam
+  completions  UserCourseCompletion[] // Reverse relation to UserCourseCompletion
+
+  creator User  @relation("CourseCreator", fields: [createdBy], references: [id]) // Relation to User
+  deleter User? @relation("CourseDeletor", fields: [deletedBy], references: [id]) // Relation to User
+}
+
+model UserCourseCompletion {
+  id        Int     @id @default(autoincrement())
+  userId    Int
+  username  String
+  user      User    @relation(fields: [userId, username], references: [id, userId])
+  courseId  Int
+  course    Course  @relation(fields: [courseId], references: [id])
+  examId    Int
+  exam      Exam    @relation(fields: [examId], references: [id])
+  processId Int
+  process   Process @relation(fields: [processId], references: [id])
+
+  completedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, courseId, examId]) // Ensures one completion record per user per course-exam
+  @@index([userId]) // Added index for better query performance
+}
+
+model courseType {
+  id    Int    @id
+  title String
+}
+
+model Enrollment {
+  id           Int     @id @default(autoincrement())
+  userId       Int
+  user         User    @relation(fields: [userId], references: [id])
+  courseId     Int
+  course       Course  @relation(fields: [courseId], references: [id])
+  progress     Float // Progress of the Worker (0 to 1)
+  completed    Boolean @default(false)
+  isDownloaded Float   @default(0) // Indicates if the enrollment is downloaded
+}
+
+model Exam {
+  id           Int                    @id @default(autoincrement())
+  title        String
+  departmentId Int?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  questions    Question[]
+  attempts     ExamAttempt[]
+  courseId     Int?
+  completions  UserCourseCompletion[] // Reverse relation to UserCourseCompletion
+  course       Course?                @relation(fields: [courseId], references: [id])
+  description  String?
+  deleted      Boolean                @default(false)
+}
+
+model Question {
+  id          Int          @id @default(autoincrement())
+  examId      Int
+  exam        Exam         @relation(fields: [examId], references: [id])
+  text        String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  choices     Choice[]
+  userAnswers UserAnswer[]
+  deleted     Boolean      @default(false)
+}
+
+model Choice {
+  id         Int          @id @default(autoincrement())
+  questionId Int
+  question   Question     @relation(fields: [questionId], references: [id])
+  text       String
+  correct    Boolean
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  UserAnswer UserAnswer[]
+  deleted    Boolean      @default(false)
+}
+
+model ExamAttempt {
+  id        Int          @id @default(autoincrement())
+  userId    Int
+  user      User         @relation(fields: [userId], references: [id])
+  examId    Int
+  exam      Exam         @relation(fields: [examId], references: [id])
+  startedAt DateTime     @default(now())
+  endedAt   DateTime?
+  grade     Float?
+  isPassed  Boolean?
+  answers   UserAnswer[]
+}
+
+model UserAnswer {
+  id               Int         @id @default(autoincrement())
+  examAttemptId    Int
+  examAttempt      ExamAttempt @relation(fields: [examAttemptId], references: [id])
+  questionId       Int
+  question         Question    @relation(fields: [questionId], references: [id])
+  selectedChoiceId Int
+  selectedChoice   Choice      @relation(fields: [selectedChoiceId], references: [id])
+  isCorrect        Boolean
+  createdAt        DateTime    @default(now())
+
+  @@unique([examAttemptId, questionId])
+}
+
+model OplDocument {
+  id          Int       @id @default(autoincrement())
+  title       String // Title of the OPL document
+  description String? // Description of the OPL content
+  fileName    String // The name of the uploaded file
+  fileType    String // Could be "PowerPoint" or "Word"
+  filePath    String // Path to the file stored in the system
+  template    Boolean   @default(false)
+  createdAt   DateTime  @default(now()) // When the file was uploaded
+  uploadedBy  Int // ID of the Admin who uploaded it
+  user        User      @relation(fields: [uploadedBy], references: [id]) // Relation to the User model (Admin)
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+}
+
+model File {
+  id           Int      @id @default(autoincrement())
+  originalName String // Original name of the uploaded file
+  storedName   String // Name of the file stored on the server
+  fileType     String // Type of the file (e.g., 'application/pdf', 'video/mp4')
+  fileSize     BigInt // Size of the file in bytes
+  filePath     String // Path to the file stored on the server
+  uploadDate   DateTime @default(now()) // When the file was uploaded
+  userId       Int? // ID of the user who uploaded the file
+  user         User?    @relation(fields: [userId], references: [id])
+  courseId     Int? // ID of the course the file is associated with
+  course       Course?  @relation(fields: [courseId], references: [id])
+}
+
+// QC Models
+
+model Process {
+  id                Int                    @id @default(autoincrement())
+  pc_bluePrintNo    String                 @unique
+  pc_imageBluePrint String
+  pc_totalProcess   Int
+  pc_userId         String
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  deletedAt         DateTime?
+  user              User                   @relation(fields: [pc_userId], references: [userId])
+  courses           Course[]               @relation("ProcessCourses")
+  completions       UserCourseCompletion[] // Reverse relation to UserCourseCompletion
+  processDetail     ProcessDetail[]
+}
+
+model ProcessDetail {
+  id              Int             @id @default(autoincrement())
+  pc_bluePrintNo  String
+  pc_processTitle String
+  pc_amountDay    Int
+  pc_reasonType   String
+  process         Process         @relation(fields: [pc_bluePrintNo], references: [pc_bluePrintNo])
+  processBranch   ProcessBranch[]
+  processMat      ProcessMat[]
+  processBom      ProcessBom[]
+}
+
+model ProcessBranch {
+  id                 Int           @id @default(autoincrement())
+  pc_processDetailId Int
+  pc_remark          String
+  processDetail      ProcessDetail @relation(fields: [pc_processDetailId], references: [id])
+}
+
+model ProcessMat {
+  id                 Int           @id @default(autoincrement())
+  pc_processDetailId Int
+  pc_matId           String
+  pc_matamount       Int
+  stock              Stock         @relation(fields: [pc_matId], references: [stockId])
+  processDetail      ProcessDetail @relation(fields: [pc_processDetailId], references: [id])
+}
+
+model ProcessBom {
+  id                 Int           @id @default(autoincrement())
+  pc_processDetailId Int
+  pc_bomId           String
+  pc_bomamount       Int
+  stock              Stock         @relation(fields: [pc_bomId], references: [stockId])
+  processDetail      ProcessDetail @relation(fields: [pc_processDetailId], references: [id])
+}
+
+model Project {
+  id               Int             @id @default(autoincrement())
+  pj_bluePrintNo   String
+  pj_serialNumber  String
+  pj_projectName   String
+  pj_startDate     DateTime
+  pj_endDate       DateTime
+  pj_amountProduct Int
+  pj_totalDay      Int
+  pj_imageProduct  String
+  pj_remark        String
+  pj_status        String
+  pj_type          String
+  pj_userId        String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  deletedAt        DateTime?
+  user             User            @relation(fields: [pj_userId], references: [userId])
+  projectDetail    ProjectDetail[]
+}
+
+model ProjectDetail {
+  id              Int              @id @default(autoincrement())
+  pj_projectId    Int
+  pj_bluePrintNo  String
+  pj_serialNumber String
+  pj_processTitle String
+  pj_amountDay    Int
+  pj_reasonType   String
+  pj_statusPc     String
+  project         Project          @relation(fields: [pj_projectId], references: [id])
+  projectBranch   ProjectBranch[]
+  projectMat      ProjectMat[]
+  projectBom      ProjectBom[]
+  ProjectResUser  ProjectResUser[]
+}
+
+model ProjectBranch {
+  id                 Int           @id @default(autoincrement())
+  pj_projectDetailId Int
+  pj_remark          String
+  projectDetail      ProjectDetail @relation(fields: [pj_projectDetailId], references: [id])
+}
+
+model ProjectMat {
+  id                 Int           @id @default(autoincrement())
+  pj_projectDetailId Int
+  pj_matId           String
+  pj_matamount       Int
+  pj_matTatal        Int
+  stock              Stock         @relation(fields: [pj_matId], references: [stockId])
+  projectDetail      ProjectDetail @relation(fields: [pj_projectDetailId], references: [id])
+}
+
+model ProjectBom {
+  id                 Int           @id @default(autoincrement())
+  pj_projectDetailId Int
+  pj_bomId           String
+  pj_bomamount       Int
+  pj_bomTatal        Int
+  stock              Stock         @relation(fields: [pj_bomId], references: [stockId])
+  projectDetail      ProjectDetail @relation(fields: [pj_projectDetailId], references: [id])
+}
+
+model ProjectResUser {
+  id                 Int           @id @default(autoincrement())
+  pj_projectDetailId Int
+  pj_userId          String
+  projectDetail      ProjectDetail @relation(fields: [pj_projectDetailId], references: [id])
+}
+
+model CompanyHour {
+  id        Int      @id @default(autoincrement())
+  hour      Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Stock {
+  id            Int          @id @default(autoincrement())
+  stockId       String       @unique
+  stockName     String
+  stockQuantity Int
+  stockType     String
+  stockTypeId   Int
+  stockImage    String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  deletedAt     DateTime?
+  processMat    ProcessMat[]
+  processBom    ProcessBom[]
+  projectMat    ProjectMat[]
+  projectBom    ProjectBom[]
+}
+
+//ยังไม่เชื่อม
+model ReasonStockNG {
+  id              Int       @id @default(autoincrement())
+  reasonstockName String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+}
+
+model ReasonTypeNG {
+  id             Int            @id @default(autoincrement())
+  reasontypeName String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  deletedAt      DateTime?
+  reasondDetail  ReasonDetail[]
+}
+
+model ReasonDetail {
+  id               Int          @id @default(autoincrement())
+  reasonTypeId     Int
+  reasondetailName String
+  reasonTypeNG     ReasonTypeNG @relation(fields: [reasonTypeId], references: [id])
+}
+
+model Report {
+  id             Int             @id @default(autoincrement())
+  projectId      Int
+  blueprintNo    String
+  serialId       String
+  reportName     String
+  amountComplete Int
+  amountNG       Int
+  timeHour       String
+  reportType     String //C=Complete //N=NG
+  status         String //W=Wait  //A=Approve
+  reasonType     String?
+  reasonDetail   String
+  reasonId       Int?
+  createdAt      DateTime        @default(now())
+  createdBy      String
+  updatedAt      DateTime        @updatedAt
+  updatedBy      String
+  deletedAt      DateTime?
+  deletedBy      String
+  reportProcess  ReportProcess[]
+}
+
+model ReportProcess {
+  id          Int           @id @default(autoincrement())
+  reportId    Int
+  processNo   String
+  amountday   Int
+  report      Report        @relation(fields: [reportId], references: [id])
+  reportStock ReportStock[]
+}
+
+model ReportStock {
+  id              Int           @id @default(autoincrement())
+  reportProcessId Int
+  stockId         String
+  stockamount     Int
+  stocktype       Int //1=Bom  //2=Mat
+  reportProcess   ReportProcess @relation(fields: [reportProcessId], references: [id])
+}

@@ -33,8 +33,24 @@ model User {
   deletedCourses    Course[]               @relation("CourseDeletor") // Courses deleted by this user
   courseCompletions UserCourseCompletion[] // Reverse relation to UserCourseCompletion
   project           Project[]
+  userProcessAccess UserProcessAccess[] // Reverse relation to UserProcessAccess
 
   @@unique([id, userId])
+}
+
+model UserProcessAccess {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  processDetailId Int
+  passed          Boolean  @default(false) // Whether the user has passed the exam for this ProcessDetail
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  // Relations
+  user          User          @relation(fields: [userId], references: [id])
+  processDetail ProcessDetail @relation(fields: [processDetailId], references: [id])
+
+  @@unique([userId, processDetailId]) // Ensures each user can have only one record per ProcessDetail
 }
 
 model Company {
@@ -127,18 +143,19 @@ model Enrollment {
 }
 
 model Exam {
-  id           Int                    @id @default(autoincrement())
-  title        String
-  departmentId Int?
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @updatedAt
-  questions    Question[]
-  attempts     ExamAttempt[]
-  courseId     Int?
-  completions  UserCourseCompletion[] // Reverse relation to UserCourseCompletion
-  course       Course?                @relation(fields: [courseId], references: [id])
-  description  String?
-  deleted      Boolean                @default(false)
+  id             Int                    @id @default(autoincrement())
+  title          String
+  departmentId   Int?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  questions      Question[]
+  attempts       ExamAttempt[]
+  courseId       Int?
+  completions    UserCourseCompletion[] // Reverse relation to UserCourseCompletion
+  course         Course?                @relation(fields: [courseId], references: [id])
+  description    String?
+  deleted        Boolean                @default(false)
+  processDetails ProcessDetail[]        @relation("ExamProcessDetails") // New relation
 }
 
 model Question {
@@ -239,15 +256,17 @@ model Process {
 }
 
 model ProcessDetail {
-  id              Int             @id @default(autoincrement())
-  pc_bluePrintNo  String
-  pc_processTitle String
-  pc_amountDay    Int
-  pc_reasonType   String
-  process         Process         @relation(fields: [pc_bluePrintNo], references: [pc_bluePrintNo])
-  processBranch   ProcessBranch[]
-  processMat      ProcessMat[]
-  processBom      ProcessBom[]
+  id                Int                 @id @default(autoincrement())
+  pc_bluePrintNo    String
+  pc_processTitle   String
+  pc_amountDay      Int
+  pc_reasonType     String
+  process           Process             @relation(fields: [pc_bluePrintNo], references: [pc_bluePrintNo])
+  processBranch     ProcessBranch[]
+  processMat        ProcessMat[]
+  processBom        ProcessBom[]
+  exams             Exam[]              @relation("ExamProcessDetails") // Reverse relation
+  userProcessAccess UserProcessAccess[] // Reverse relation to UserProcessAccess
 }
 
 model ProcessBranch {

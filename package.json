@@ -1,6 +1,6 @@
 {
   "name": "qctraining-schema",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "shared schema for qctrn project",
   "main": "index.js",
   "scripts": {
